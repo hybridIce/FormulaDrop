@@ -1,0 +1,31 @@
+name: Publish desktop apps
+on:
+  push:
+    paths: ['.github/workflows/release.yml', 'scripts/build_macos.sh', 'scripts/smoke_macos.py', 'desktop/macos/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - run: pip install -r requirements.txt pyinstaller==6.22.2
+      - run: python prepare_models.py
+      - run: bash scripts/build_macos.sh
+      - name: Retrieve tested Windows build
+        run: |
+          gh run download 34200779059 --repo hybridIce/FormulaDrop --name FormulaDrop-Windows-x64 --dir dist/FormulaDrop-Windows-x64
+          cat dist/FormulaDrop-Windows-x64/smoke-result.txt
+          cd dist
+          zip -qr FormulaDrop-Windows-x64.zip FormulaDrop-Windows-x64
+      - name: Publish both packages
+        run: |
+          shasum -a 256 dist/FormulaDrop-*.zip > dist/SHA256SUMS.txt
+          gh release create v1.0.0 --target "$GITHUB_SHA" --title 'FormulaDrop 1.0.0' --notes-file RELEASE_NOTES.md dist/FormulaDrop-macOS-arm64.zip dist/FormulaDrop-Windows-x64.zip dist/SHA256SUMS.txt
