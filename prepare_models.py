@@ -15,7 +15,7 @@ for name, expected in manifest['sha256'].items():
     for attempt in range(3):
         temp=target.with_suffix('.download')
         try:
-            print(f'下载本地模型：{name}（{attempt+1}/3）',flush=True)
+            print(f'Downloading model: {name} ({attempt+1}/3)',flush=True)
             url=f"https://huggingface.co/{manifest['repository']}/resolve/{manifest['revision']}/{name}"
             with requests.get(url,stream=True,timeout=(20,90)) as response:
                 response.raise_for_status()
@@ -30,4 +30,4 @@ for name, expected in manifest['sha256'].items():
             if attempt==2:raise
             time.sleep(2)
 FormulaOCR()
-print('新版本地模型验证通过，可离线运行。')
+print('Model verified; ready for offline use.')

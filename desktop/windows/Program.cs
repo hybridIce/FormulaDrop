@@ -33,6 +33,7 @@ internal sealed class Backend : IDisposable
             WorkingDirectory = root, UseShellExecute = false, CreateNoWindow = true,
             RedirectStandardOutput = true, RedirectStandardError = true
         };
+        start.ArgumentList.Add("-X"); start.ArgumentList.Add("utf8");
         start.ArgumentList.Add(Path.Combine(root, "server.py"));
         start.ArgumentList.Add("--port-file"); start.ArgumentList.Add(Path.Combine(DirectoryPath, "port.json"));
         process = new Process { StartInfo = start };
