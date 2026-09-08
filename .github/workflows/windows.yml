@@ -19,7 +19,8 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python prepare_models.py
       - run: dotnet publish desktop/windows/FormulaDrop.csproj -c Release -r win-x64 --self-contained true -o build/publish
-      - run: pip download --only-binary=:all: -r requirements.txt -d build/wheels
+      - run: |
+          pip download --only-binary=:all: -r requirements.txt -d build/wheels
       - shell: pwsh
         run: Invoke-WebRequest https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip -OutFile build/python.zip
       - run: python scripts/package_windows.py --publish build/publish --wheels build/wheels --python-zip build/python.zip --output dist/FormulaDrop-Windows-x64
