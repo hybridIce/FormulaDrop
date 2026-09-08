@@ -1,0 +1,14 @@
+{
+  "repository": "breezedeus/pix2text-mfr-1.5",
+  "revision": "1cef9f0bdcd6a4c63df7de1311fb0894593340cc",
+  "sha256": {
+    "tokenizer_config.json": "f5cc321e8545940295fba11e9a59f4f2a208a23af3d63cc8c355c78593645b99",
+    "special_tokens_map.json": "8c785abebea9ae3257b61681b4e6fd8365ceafde980c21970d001e834cf10835",
+    "config.json": "fe4076f08f6ca75940f6af9268d51928b834979a69bc2145dacee62633a5d53d",
+    "tokenizer.json": "4ffbeb2143e6a38324bb6111b7a8109530d38a076a8439aa5777535f0a32758a",
+    "decoder_model.onnx": "917deb98e91a0453c5f234f58a0f32f9fb037de8527c7eb4ed394daf9e692f2a",
+    "generation_config.json": "7363c031c6142d35a276815b0e285cc289dfb9f51d0b7c63de8f3ed65cc8d8ad",
+    "encoder_model.onnx": "080a3f660f08bc9ebcacdd96e34be6b6400f8c7e62d7cd0dd8251badc37f610b",
+    "preprocessor_config.json": "36a945a7cc645688b9ef64dabae16979cf5f7c1c448569cc306694edc0598b9b"
+  }
+}

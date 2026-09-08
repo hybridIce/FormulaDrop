@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>FormulaDrop · 公式随手贴</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23296552'/%3E%3Ctext x='18' y='45' fill='white' font-size='40'%3Eƒ%3C/text%3E%3C/svg%3E"><link rel="stylesheet" href="/static/vendor/katex.min.css"><link rel="stylesheet" href="/static/style.css"><script defer src="/static/vendor/katex.min.js"></script><script defer src="/static/app.js"></script></head>
+<body>
+<header><a class="brand" href="/"><span class="logo">ƒ</span> FormulaDrop</a><span id="health" class="health"><i></i><span>正在连接本地模型</span></span></header>
+<main>
+<div class="toolbar"><div class="toolbar-actions"><button id="capture" class="capture-button"><span>截图</span></button><button id="upload" class="secondary">上传图片</button><span class="paste-hint">或 ⌘ V 粘贴</span></div><button id="help" class="plain">帮助</button></div>
+<div class="workspace">
+<section class="panel input-panel"><div class="panel-title"><h2>图片</h2><span class="muted">拖动可裁剪</span></div>
+<div id="drop" class="drop" role="button" tabindex="0" aria-label="上传公式图片"><div class="upload-symbol">＋</div><p>拖入图片，或点击上传</p></div>
+<input id="file" type="file" accept="image/png,image/jpeg,image/webp,image/bmp" hidden>
+<div id="image-area" hidden><div class="image-frame"><canvas id="canvas" aria-label="公式图片；拖动框选裁剪区域"></canvas></div><div class="image-tools"><span id="image-info"></span><div><button id="crop" class="small" disabled>裁剪选区</button><button id="reset-image" class="small">还原</button><button id="replace" class="small">换一张</button></div></div></div>
+<div class="input-bottom"><button id="recognize" class="primary" disabled><span>识别公式</span><span>↗</span></button></div>
+</section>
+<section class="panel result-panel"><div class="panel-title"><h2>公式</h2><span id="timing" class="muted">可编辑结果</span></div>
+<span id="edited" class="muted"></span><div id="preview" class="preview"><div class="empty-preview"><span>ƒ(x)</span><p>识别结果</p></div></div><p id="parse-error" class="error" hidden></p>
+<details class="source-editor"><summary>编辑 LaTeX</summary><div class="editor-title"><label for="latex">LaTeX 源码</label><button id="clear" class="plain">清空</button></div><textarea id="latex" spellcheck="false" placeholder="识别后可在这里修改，也可以直接输入 LaTeX…" aria-label="LaTeX 源码"></textarea></details>
+<div class="copy-options"><label for="copy-format">复制格式</label><select id="copy-format"><option value="latex">LaTeX</option><option value="inline">行内 Markdown</option><option value="block">块级 Markdown</option><option value="mathml">MathML</option></select></div>
+<div class="export-row"><button id="copy" class="primary" disabled>复制 LaTeX <span>⧉</span></button><button id="word-copy" class="secondary" disabled>复制到 Word</button><button id="word" class="icon-button" title="下载可编辑 Word 文档" aria-label="下载可编辑 Word 文档" disabled>↓ .docx</button></div>
+
+</section></div>
+<div id="status" role="status" aria-live="polite"></div>
+<details class="under"><summary>历史与示例</summary><div class="examples"><span class="eyebrow">先试试看</span><button class="example" data-example="0"><span id="ex0"></span><span>载入示例图 ↗</span></button><button class="example" data-example="1"><span id="ex1"></span><span>载入示例图 ↗</span></button><button class="example" data-example="2"><span id="ex2"></span><span>载入示例图 ↗</span></button></div><div class="history"><div class="history-heading"><h2>最近的公式 <span>仅保存在此浏览器</span></h2><button id="clear-history" class="plain">清除记录</button></div><div id="history-list"><p class="muted">识别完成后，公式会保存在这里。</p></div></div></details>
+<footer><span><i class="privacy-dot"></i> 本地识别，图片不上传</span></footer>
+</main><div id="toast" role="status" hidden></div>
+<dialog id="help-dialog"><button id="close-help" class="close" aria-label="关闭说明">×</button><span class="eyebrow">QUICK START</span><h2>截图。粘贴。复制。</h2><p>点击“截图”立即打开 macOS 框选截图，拖动鼠标选中公式，松开后自动识别。按 Esc 可取消。首次使用如提示屏幕录制权限，请在系统设置中允许启动本工具的应用，然后重启工具。</p><p>Mac 按 <kbd>⌃</kbd> + <kbd>⇧</kbd> + <kbd>⌘</kbd> + <kbd>4</kbd>，框选公式并复制到剪贴板，回到此页按 <kbd>⌘ V</kbd>。</p><p>也可拖入图片或点击上传。图片上拖动可框选裁剪区域，然后点击“识别公式”。</p><p>修改 LaTeX 源码会实时更新预览。可以复制 LaTeX、行内 / 块级 Markdown 或 MathML。</p><p>“复制到 Word”写入富文本 MathML，兼容性取决于 Word 版本。如果粘贴未生成公式，请下载 .docx 并复制其中的原生公式；支持 LaTeX 输入的 Word 也可以在公式框内粘贴 LaTeX。</p><p>本地模型主要面向单个印刷公式。手写、整页文字、模糊图片和复杂矩阵可能识别不准确，请核对结果。历史仅保存最近 20 条公式文本，不保存图片。</p><button id="help-ok" class="primary">知道了</button></dialog>
+</body></html>

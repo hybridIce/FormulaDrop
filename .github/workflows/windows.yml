@@ -1,0 +1,34 @@
+name: Windows build and smoke test
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: pip install -r requirements.txt
+      - run: python prepare_models.py
+      - run: dotnet publish desktop/windows/FormulaDrop.csproj -c Release -r win-x64 --self-contained true -o build/publish
+      - run: pip download --only-binary=:all: -r requirements.txt -d build/wheels
+      - shell: pwsh
+        run: Invoke-WebRequest https://www.python.org/ftp/python/3.10.11/python-3.10.11-embed-amd64.zip -OutFile build/python.zip
+      - run: python scripts/package_windows.py --publish build/publish --wheels build/wheels --python-zip build/python.zip --output dist/FormulaDrop-Windows-x64
+      - shell: pwsh
+        run: |
+          $app = Start-Process -FilePath dist/FormulaDrop-Windows-x64/FormulaDrop.exe -ArgumentList '--smoke-test' -Wait -PassThru
+          Get-Content dist/FormulaDrop-Windows-x64/smoke-result.txt
+          if ($app.ExitCode -ne 0) { throw 'Windows runtime smoke test failed' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FormulaDrop-Windows-x64
+          path: dist/FormulaDrop-Windows-x64/
