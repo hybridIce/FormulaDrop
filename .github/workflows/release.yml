@@ -22,10 +22,11 @@ jobs:
       - name: Retrieve tested Windows build
         run: |
           gh run download 34200779059 --repo hybridIce/FormulaDrop --name FormulaDrop-Windows-x64 --dir dist/FormulaDrop-Windows-x64
+          cp static/index.html static/app.js static/style.css dist/FormulaDrop-Windows-x64/backend/static/
           cat dist/FormulaDrop-Windows-x64/smoke-result.txt
           cd dist
           zip -qr FormulaDrop-Windows-x64.zip FormulaDrop-Windows-x64
       - name: Publish both packages
         run: |
-          shasum -a 256 dist/FormulaDrop-*.zip > dist/SHA256SUMS.txt
-          gh release create v1.0.0 --target "$GITHUB_SHA" --title 'FormulaDrop 1.0.0' --notes-file RELEASE_NOTES.md dist/FormulaDrop-macOS-arm64.zip dist/FormulaDrop-Windows-x64.zip dist/SHA256SUMS.txt
+          (cd dist && shasum -a 256 FormulaDrop-*.zip > SHA256SUMS.txt)
+          gh release create v1.0.1 --target "$GITHUB_SHA" --title 'FormulaDrop 1.0.1' --notes-file RELEASE_NOTES.md dist/FormulaDrop-macOS-arm64.zip dist/FormulaDrop-Windows-x64.zip dist/SHA256SUMS.txt
