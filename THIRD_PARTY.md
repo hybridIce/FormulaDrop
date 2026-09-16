@@ -2,7 +2,7 @@
 
 FormulaDrop uses these independent open-source components. Their original licenses apply to the respective components.
 
-- [Pix2Text MFR 1.5](https://huggingface.co/breezedeus/pix2text-mfr-1.5): MIT model card; encoder, decoder and tokenizer. Version revision and SHA-256 checksums are pinned in `model-manifest.json`. Model card bundled in `models/mfr-1.5/README.md`.
+- [Pix2Text MFR 1.5](https://huggingface.co/breezedeus/pix2text-mfr-1.5): MIT model card; encoder, decoder and tokenizer. The model revision is pinned in `model-manifest.json`. Model card bundled in `models/mfr-1.5/README.md`.
 - [Hugging Face Tokenizers](https://github.com/huggingface/tokenizers): Apache-2.0.
 - [KaTeX](https://github.com/KaTeX/KaTeX): MIT; bundled license in `static/vendor/LICENSE`, fonts distributed with KaTeX.
 - [FastAPI](https://github.com/fastapi/fastapi): MIT.

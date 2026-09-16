@@ -11,6 +11,12 @@
 
 点击“截图”，拖动选择公式，松开鼠标即可识别；Esc 取消。也支持上传或粘贴图片。使用“复制”选择 LaTeX / MathML，或直接导出 Word 文档。首次启动会预热模型，复杂、模糊、手写公式可能识别错误，请核对结果。
 
+## 效果图
+
+![FormulaDrop 主界面](screenshots/formuladrop-main.png)
+
+![编辑公式并复制到 WPS](screenshots/formuladrop-wps.png)
+
 ## 从源码运行
 
 需要 Python 3.10。
@@ -29,6 +35,6 @@ Windows 的完整构建、打包与 OCR / Word 验证流程见 `.github/workflow
 
 ## 模型与许可
 
-使用 [Pix2Text MFR 1.5](https://huggingface.co/breezedeus/pix2text-mfr-1.5) 与 ONNX Runtime。模型版本及 SHA-256 校验固定在 `model-manifest.json`，不将模型权重提交到 Git。
+使用 [Pix2Text MFR 1.5](https://huggingface.co/breezedeus/pix2text-mfr-1.5) 与 ONNX Runtime。模型版本记录在 `model-manifest.json`，不将模型权重提交到 Git。
 
 项目代码采用 MIT 许可。第三方组件保留各自许可，见 [THIRD_PARTY.md](THIRD_PARTY.md)。
