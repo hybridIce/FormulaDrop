@@ -15,7 +15,7 @@
 
 ![FormulaDrop 主界面](screenshots/formuladrop-main.png)
 
-![编辑公式并复制到 WPS](screenshots/formuladrop-wps.png)
+![公式编辑与 WPS 导出](screenshots/formuladrop-wps.png)
 
 ## 从源码运行
 
