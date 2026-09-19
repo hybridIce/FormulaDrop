@@ -1,18 +1,24 @@
 name: Publish desktop apps
 on:
-  push:
-    paths: ['.github/workflows/release.yml', 'scripts/build_macos.sh', 'scripts/smoke_macos.py', 'desktop/macos/**']
+  workflow_run:
+    workflows: ['Windows build and smoke test']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: write
   actions: read
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_sha == github.sha)
     runs-on: macos-15
     env:
       GH_TOKEN: ${{ github.token }}
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_SHA }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
@@ -21,12 +27,15 @@ jobs:
       - run: bash scripts/build_macos.sh
       - name: Retrieve tested Windows build
         run: |
-          gh run download 34200779059 --repo hybridIce/FormulaDrop --name FormulaDrop-Windows-x64 --dir dist/FormulaDrop-Windows-x64
-          cp static/index.html static/app.js static/style.css dist/FormulaDrop-Windows-x64/backend/static/
+          run_id=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow windows.yml --commit "$RELEASE_SHA" --status success --json databaseId --jq '.[0].databaseId')
+          test -n "$run_id" && test "$run_id" != null
+          gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name FormulaDrop-Windows-x64 --dir dist/FormulaDrop-Windows-x64
           cat dist/FormulaDrop-Windows-x64/smoke-result.txt
           cd dist
           zip -qr FormulaDrop-Windows-x64.zip FormulaDrop-Windows-x64
       - name: Publish both packages
         run: |
-          (cd dist && shasum -a 256 FormulaDrop-*.zip > SHA256SUMS.txt)
-          gh release create v1.0.1 --target "$GITHUB_SHA" --title 'FormulaDrop 1.0.1' --notes-file RELEASE_NOTES.md dist/FormulaDrop-macOS-arm64.zip dist/FormulaDrop-Windows-x64.zip dist/SHA256SUMS.txt
+          latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$latest" != "$RELEASE_SHA" ]; then echo 'A newer commit is building; skip this release.'; exit 0; fi
+          version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/macos/Info.plist)
+          gh release create "v$version" --target "$RELEASE_SHA" --title "FormulaDrop $version" --notes-file RELEASE_NOTES.md dist/FormulaDrop-macOS-arm64.zip dist/FormulaDrop-Windows-x64.zip

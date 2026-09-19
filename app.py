@@ -181,6 +181,13 @@ def office_math(latex):
     source = etree.fromstring(mathml(latex).encode())
     # latex2mathml represents display-style movable limits as ordinary scripts.
     for node in source.iter():
+        if etree.QName(node).localname == "mspace":
+            # The converter otherwise discards all mspace widths. A word
+            # joiner keeps whitespace-only SAX text from being discarded.
+            spaces = {"0.167em": "\u2006", "0.222em": "\u2005", "0.278em": "\u2004", "1em": "\u2003", "2em": "\u2003\u2003"}
+            if node.get("width") in spaces:
+                node.text = "\u2060" + spaces[node.get("width")]
+                node.tag = f"{{{mml_ns}}}mtext"
         replacement = {"msub": "munder", "msup": "mover", "msubsup": "munderover"}.get(etree.QName(node).localname)
         if (replacement and len(node) and node[0].get("movablelimits") == "true"
                 and not any(p.get("displaystyle") == "false" for p in node.iterancestors())):
@@ -204,6 +211,15 @@ def office_math(latex):
         etree.SubElement(props, f"{{{office_ns}}}degHide", {f"{{{office_ns}}}val": "1"})
         radical.insert(0, props)
         radical.insert(1, etree.Element(f"{{{office_ns}}}deg"))
+    for nary in root.xpath(".//m:nary", namespaces=ns):
+        props = nary.find("m:naryPr", ns)
+        if props is None:
+            props = etree.Element(f"{{{office_ns}}}naryPr")
+            nary.insert(0, props)
+        for argument in ("sub", "sup"):
+            node = nary.find(f"m:{argument}", ns)
+            if node is None or len(node) == 0:
+                etree.SubElement(props, f"{{{office_ns}}}{argument}Hide", {f"{{{office_ns}}}val": "1"})
     for run in root.xpath(".//m:r", namespaces=ns):
         props = etree.Element(f"{{{word_ns}}}rPr")
         etree.SubElement(props, f"{{{word_ns}}}rFonts", {

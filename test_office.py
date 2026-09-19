@@ -42,6 +42,12 @@ class OfficeExportTests(unittest.TestCase):
         self.assertEqual(len(root.xpath('//m:m/m:mr', namespaces=NS)), 2)
         self.assertEqual(len(root.xpath('//m:m/m:mr/m:e', namespaces=NS)), 4)
 
+    def test_absent_sum_limit_and_explicit_spacing(self):
+        root = self.export(r'\sqrt{\frac{1}{6}\sum_j e_{ij}^2},\quad\operatorname*{max}_j|e_{ij}|')
+        self.assertEqual(root.xpath('//m:naryPr/m:supHide/@m:val', namespaces=NS), ['1'])
+        self.assertFalse(root.xpath('//m:naryPr/m:subHide', namespaces=NS))
+        self.assertIn('\u2003', ''.join(root.xpath('//m:t/text()', namespaces=NS)))
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -16,7 +16,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.0.x'
-      - run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt httpx==0.28.1
+      - run: python -m unittest test_office test_capture -v
       - run: python prepare_models.py
       - run: dotnet publish desktop/windows/FormulaDrop.csproj -c Release -r win-x64 --self-contained true -o build/publish
       - run: |
