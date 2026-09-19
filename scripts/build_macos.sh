@@ -22,7 +22,11 @@ iconutil -c icns build/AppIcon.iconset -o "$bundle/Contents/Resources/AppIcon.ic
 # Reuse the same certificate across local updates. Never weaken the designated
 # requirement to the bundle identifier alone; it would accept unrelated code.
 # Unsigned public builds can still use ad-hoc signing, but may need a new grant.
-codesign --force --deep --sign "${FORMULADROP_SIGNING_IDENTITY:--}" "$bundle"
+signing_identity="${FORMULADROP_SIGNING_IDENTITY:-}"
+if [ -z "$signing_identity" ] && [ -f .local-signing-identity ]; then
+  signing_identity=$(cat .local-signing-identity)
+fi
+codesign --force --deep --sign "${signing_identity:--}" "$bundle"
 codesign --verify --deep --strict "$bundle"
 python scripts/smoke_macos.py "$bundle/Contents/Resources/backend/formuladrop-server"
 ditto -c -k --sequesterRsrc --keepParent "$bundle" dist/FormulaDrop-macOS-arm64.zip

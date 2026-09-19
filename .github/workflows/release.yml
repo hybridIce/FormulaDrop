@@ -38,4 +38,5 @@ jobs:
           latest=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
           if [ "$latest" != "$RELEASE_SHA" ]; then echo 'A newer commit is building; skip this release.'; exit 0; fi
           version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' desktop/macos/Info.plist)
+          if gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then echo "v$version is already published; bump the version for a new release."; exit 0; fi
           gh release create "v$version" --target "$RELEASE_SHA" --title "FormulaDrop $version" --notes-file RELEASE_NOTES.md dist/FormulaDrop-macOS-arm64.zip dist/FormulaDrop-Windows-x64.zip

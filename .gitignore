@@ -8,3 +8,4 @@ obj/
 build/
 dist/
 .DS_Store
+.local-signing-identity
