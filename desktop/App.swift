@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
     var launchDirectory: URL!
     var logHandle: FileHandle?
     var attempts = 0
+    var regionCapture: AnyObject?
+    var captureActive = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let main = NSMenu()
@@ -44,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         startBackend()
     }
     @objc func about() {
-        NSApp.orderFrontStandardAboutPanel(options: [.applicationName:"FormulaDrop", .applicationVersion:"1.0", .credits:NSAttributedString(string:"本地公式识别 · 截图转 LaTeX / Word\nPix2Text MFR 1.5 · ONNX Runtime")])
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationName:"FormulaDrop", .applicationVersion:Bundle.main.object(forInfoDictionaryKey:"CFBundleShortVersionString") as? String ?? "", .credits:NSAttributedString(string:"本地公式识别 · 截图转 LaTeX / Word / WPS\nPix2Text MFR 1.5 · ONNX Runtime")])
     }
     func startBackend() {
         do {
@@ -86,8 +88,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         let alert = NSAlert(); alert.messageText = "FormulaDrop 启动失败"; alert.informativeText = message + "\n日志：" + (launchDirectory?.appendingPathComponent("backend.log").path ?? "")
         alert.addButton(withTitle:"退出"); alert.runModal(); NSApp.terminate(nil)
     }
-    func reply(_ id: String, error: String? = nil) {
-        let info: [String:Any] = ["id":id,"error":error as Any? ?? NSNull()]
+    func reply(_ id: String, data: Any? = nil, error: String? = nil) {
+        let info: [String:Any] = ["id":id,"data":data ?? NSNull(),"error":error as Any? ?? NSNull()]
         if let data = try? JSONSerialization.data(withJSONObject:info), let json = String(data:data,encoding:.utf8) {
             web.evaluateJavaScript("window.formulaNativeReply && window.formulaNativeReply(\(json))", completionHandler:nil)
         }
@@ -96,6 +98,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         guard message.frameInfo.isMainFrame, let origin = message.frameInfo.request.url, origin.host == "127.0.0.1", origin.port == port,
               let body = message.body as? [String:Any], let id = body["id"] as? String, let action = body["action"] as? String else { return }
         switch action {
+        case "capture":
+            guard !captureActive else { reply(id,error:"请先完成当前截图。"); return }
+            guard #available(macOS 14.0, *) else { reply(id,error:"App 内区域截图需要 macOS 14 或更新版本；请使用系统截图后粘贴。"); return }
+            // ScreenCaptureKit is the authority for this capture. A separate
+            // CGPreflight check can disagree with the current session's grant.
+            captureActive = true
+            window.orderOut(nil)
+            DispatchQueue.main.asyncAfter(deadline:.now() + 0.18) { [weak self] in
+                guard let self = self else { return }
+                let capture = RegionCapture(); self.regionCapture = capture
+                capture.start { [weak self] result in
+                    guard let self = self else { return }
+                    self.captureActive = false; self.regionCapture = nil
+                    NSApp.unhide(nil); self.window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps:true)
+                    switch result {
+                    case .success(let png): self.reply(id, data: png)
+                    case .failure(let error): self.reply(id,error:error.localizedDescription)
+                    }
+                }
+            }
         case "copy":
             let text = body["text"] as? String ?? ""
             let board = NSPasteboard.general; board.clearContents()
@@ -104,13 +126,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
             reply(id)
         case "save":
             guard let encoded = body["base64"] as? String, let data = Data(base64Encoded:encoded), data.count < 20_000_000 else { reply(id,error:"文档数据无效"); return }
-            let panel = NSSavePanel(); panel.nameFieldStringValue = "formula.docx"; panel.canCreateDirectories = true
+            let panel = NSSavePanel(); panel.nameFieldStringValue = "formula.docx"; panel.allowedFileTypes = ["docx"]; panel.canCreateDirectories = true
             panel.beginSheetModal(for:window) { [weak self] result in
                 guard let self = self else { return }
                 if result != .OK { self.reply(id,error:"已取消保存"); return }
                 do { try data.write(to:panel.url!,options:.atomic); self.reply(id) }
                 catch { self.reply(id,error:"保存失败：" + error.localizedDescription) }
             }
+        case "open-wps":
+            guard let encoded = body["base64"] as? String, let data = Data(base64Encoded:encoded), data.count < 20_000_000 else { reply(id,error:"文档数据无效"); return }
+            guard let wps = NSWorkspace.shared.urlForApplication(withBundleIdentifier:"com.kingsoft.wpsoffice.mac") else {
+                reply(id,error:"未找到 WPS Office，请用 ↓ .docx 保存后手动打开。"); return
+            }
+            do {
+                let directory = FileManager.default.urls(for:.applicationSupportDirectory,in:.userDomainMask)[0].appendingPathComponent("FormulaDrop/WPS",isDirectory:true)
+                try FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+                let file = directory.appendingPathComponent("公式-" + UUID().uuidString.prefix(8) + ".docx")
+                try data.write(to:file,options:.atomic)
+                let config = NSWorkspace.OpenConfiguration()
+                NSWorkspace.shared.open([file],withApplicationAt:wps,configuration:config) { [weak self] _, error in
+                    DispatchQueue.main.async {
+                        if let error = error { self?.reply(id,error:"WPS 未能打开文档：" + error.localizedDescription) }
+                        else { self?.reply(id) }
+                    }
+                }
+            } catch { reply(id,error:"生成 WPS 文档失败：" + error.localizedDescription) }
         case "hide":
             NSApp.hide(nil)
             DispatchQueue.main.asyncAfter(deadline:.now() + 0.15) { [weak self] in self?.reply(id) }
@@ -128,15 +168,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate, 
         if url.scheme == "about" || (url.host == "127.0.0.1" && url.port == port) { decisionHandler(.allow) }
         else { decisionHandler(.cancel) }
     }
-    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { !captureActive }
     func applicationWillTerminate(_ notification: Notification) {
         startupTimer?.invalidate()
         if let process = backend, process.isRunning { process.terminate() }
         try? logHandle?.close()
     }
 }
-let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
-app.setActivationPolicy(.regular)
-app.run()
+@main struct FormulaDropMain {
+    @MainActor static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        app.setActivationPolicy(.regular)
+        withExtendedLifetime(delegate) { app.run() }
+    }
+}

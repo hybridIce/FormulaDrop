@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Win32;
 
 namespace FormulaDropDesktop;
 
@@ -119,11 +120,29 @@ internal sealed class MainWindow : Form
                 case "save":
                     byte[] bytes = Convert.FromBase64String(request.GetProperty("base64").GetString()!);
                     if (bytes.Length > 20_000_000) throw new Exception("文档过大");
-                    using (var dialog = new SaveFileDialog { FileName = "formula.docx", Filter = "Word 文档 (*.docx)|*.docx", DefaultExt = "docx", AddExtension = true }) {
+                    using (var dialog = new SaveFileDialog { FileName = "formula.docx", Filter = "Office 文档 (*.docx)|*.docx", DefaultExt = "docx", AddExtension = true }) {
                         if (dialog.ShowDialog(this) != DialogResult.OK) { Reply(id, error: "已取消保存"); break; }
                         await File.WriteAllBytesAsync(dialog.FileName, bytes); Reply(id);
                     }
                     break;
+                case "open-wps":
+                    byte[] wpsBytes = Convert.FromBase64String(request.GetProperty("base64").GetString()!);
+                    if (wpsBytes.Length == 0 || wpsBytes.Length > 20_000_000) throw new Exception("文档数据无效");
+                    string? wpsExe = null;
+                    foreach (var hive in new[] { Registry.CurrentUser, Registry.LocalMachine }) {
+                        using var key = hive.OpenSubKey(@"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\wps.exe");
+                        var candidate = (key?.GetValue("") as string)?.Trim('"');
+                        if (candidate != null && File.Exists(candidate)) { wpsExe = candidate; break; }
+                    }
+                    if (wpsExe == null) throw new Exception("未找到 WPS Office，请用 ↓ .docx 保存后手动打开。");
+                    string wpsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FormulaDrop", "WPS");
+                    Directory.CreateDirectory(wpsFolder);
+                    string wpsFile = Path.Combine(wpsFolder, "公式-" + Guid.NewGuid().ToString("N")[..8] + ".docx");
+                    await File.WriteAllBytesAsync(wpsFile, wpsBytes);
+                    var wpsStart = new ProcessStartInfo(wpsExe) { UseShellExecute = false };
+                    wpsStart.ArgumentList.Add(wpsFile);
+                    Process.Start(wpsStart)?.Dispose();
+                    Reply(id); break;
                 case "capture":
                     if (capturing) { Reply(id, error: "请先完成当前截图"); break; }
                     capturing = true;

@@ -12,7 +12,7 @@ let history=[];
 try { const saved=JSON.parse(localStorage.getItem('formuladrop.history') || '[]'); history=Array.isArray(saved)?saved.filter(v=>typeof v==='string'&&v.length<=12000).slice(0,20):[]; } catch {}
 function status(text='', error=false){ $('status').textContent=text; $('status').classList.toggle('error',error); }
 function toast(text){$('toast').textContent=text;$('toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('toast').hidden=true,3500);}
-function updateButtons(){ const locked=busy||capturing; $('capture').disabled=locked; $('capture').firstElementChild.textContent=capturing?'正在框选…':'截图'; $('recognize').disabled=!currentBlob||!ready||locked; $('recognize').classList.toggle('busy',busy); $('recognize').firstElementChild.textContent=busy?'正在识别…':'识别公式'; for(const id of ['copy','word','word-copy']) $(id).disabled=!$('latex').value.trim()||locked; $('replace').disabled=locked; $('upload').disabled=locked; $('crop').disabled=locked||!selection; $('reset-image').disabled=locked; $('latex').readOnly=locked; for(const button of document.querySelectorAll('.example')) button.disabled=locked; }
+function updateButtons(){ const locked=busy||capturing; $('capture').disabled=locked; $('capture').firstElementChild.textContent=capturing?'正在框选…':'截图'; $('recognize').disabled=!currentBlob||!ready||locked; $('recognize').classList.toggle('busy',busy); $('recognize').firstElementChild.textContent=busy?'正在识别…':'识别公式'; for(const id of ['copy','word','word-copy','wps-copy']) $(id).disabled=!$('latex').value.trim()||locked; $('replace').disabled=locked; $('upload').disabled=locked; $('crop').disabled=locked||!selection; $('reset-image').disabled=locked; $('latex').readOnly=locked; for(const button of document.querySelectorAll('.example')) button.disabled=locked; }
 async function api(url, body){const r=await fetch(url,{method:'POST',headers:body instanceof FormData?{}:{'Content-Type':'application/json'},body:body instanceof FormData?body:JSON.stringify(body)});if(!r.ok){let message='操作失败，请稍后再试。';const raw=await r.text();try{const detail=JSON.parse(raw).detail;message=typeof detail==='string'?detail:'公式过长或输入格式不正确。';}catch{if(raw.length<200)message=raw;}throw Error(message);}return r;}
 function render(){ const text=$('latex').value.trim();$('parse-error').hidden=true; if(!text){$('preview').innerHTML='<div class="empty-preview"><span>ƒ(x)</span><p>识别结果</p></div>';}else{try{katex.render(text,$('preview'),{displayMode:true,throwOnError:true,trust:false,maxExpand:1000});}catch(e){$('preview').textContent='暂时无法预览';$('parse-error').textContent='请检查公式语法：'+e.message.replace(/^KaTeX parse error: /,'');$('parse-error').hidden=false;}} updateButtons(); }
 function setLatex(text){$('latex').value=text;version++;$('edited').textContent='';render();}
@@ -33,8 +33,33 @@ const labels={latex:'LaTeX',inline:'行内公式',block:'块级公式',mathml:'M
 $('copy-format').onchange=()=>{format=$('copy-format').value;$('copy').innerHTML=`复制 ${labels[format]} <span>⧉</span>`;};
 async function mathml(text){return (await (await api('/api/mathml',{latex:text})).json()).mathml;}
 async function copyText(text){if(isDesktop){await nativeCall('copy',{text});return;}if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);return;}const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();if(!ok)throw Error('浏览器未允许复制，请手动选择源码复制。');}
-$('copy').onclick=async()=>{const text=$('latex').value.trim(), chosen=format;if(!text)return;try{if(chosen==='mathml'&&!isDesktop&&navigator.clipboard?.write&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({'text/plain':mathml(text).then(v=>new Blob([v],{type:'text/plain'}))})]);}else{await copyText(chosen==='inline'?`$${text}$`:chosen==='block'?`$$\n${text}\n$$`:chosen==='mathml'?await mathml(text):text);}toast(`已复制 ${labels[chosen]}`);}catch(e){status(e.message||'复制失败，请允许剪贴板访问。',true);}};
-$('word-copy').onclick=async()=>{const text=$('latex').value.trim();if(!text)return;try{if(isDesktop){const m=await mathml(text);await nativeCall('copy',{text,html:`<html><body>${m}</body></html>`});toast('已复制到剪贴板，可粘贴到 Word');return;}if(!navigator.clipboard?.write||!window.ClipboardItem)throw Error('此浏览器不支持富文本复制，请下载 .docx。');const html=mathml(text).then(m=>new Blob([`<html><body><!--StartFragment-->${m}<!--EndFragment--></body></html>`],{type:'text/html'}));await navigator.clipboard.write([new ClipboardItem({'text/html':html,'text/plain':new Blob([text],{type:'text/plain'})})]);toast('已复制。若 Word 未显示公式，请下载 .docx。');}catch(e){status('富文本复制未完成，请使用右侧 ↓ .docx 下载可编辑公式。',true);}};
+async function copyOfficeFormula(text){
+    const m=await mathml(text);
+    const html=`<html><body><!--StartFragment-->${m}<!--EndFragment--></body></html>`;
+    if(isDesktop){await nativeCall('copy',{text,html});return;}
+    if(!navigator.clipboard?.write||!window.ClipboardItem)throw Error('此浏览器不支持富文本复制，请下载 .docx。');
+    await navigator.clipboard.write([new ClipboardItem({'text/html':new Blob([html],{type:'text/html'}),'text/plain':new Blob([text],{type:'text/plain'})})]);
+}
+$('copy').onclick=async()=>{const text=$('latex').value.trim(), chosen=format;if(!text)return;try{
+    if(chosen==='mathml'&&!isDesktop&&navigator.clipboard?.write&&window.ClipboardItem){await navigator.clipboard.write([new ClipboardItem({'text/plain':new Blob([await mathml(text)],{type:'text/plain'})})]);toast(`已复制 ${labels[chosen]}`);}
+    else{await copyText(chosen==='inline'?`$${text}$`:chosen==='block'?`$$\n${text}\n$$`:chosen==='mathml'?await mathml(text):text);toast(`已复制 ${labels[chosen]}`);}
+}catch(e){status(e.message||'复制失败，请允许剪贴板访问。',true);}};
+$('word-copy').onclick=async()=>{const text=$('latex').value.trim();if(!text)return;try{await copyOfficeFormula(text);toast('已复制到剪贴板，可粘贴到 Word');}catch(e){status('富文本复制未完成，请使用右侧 ↓ .docx 下载可编辑公式。',true);}};
+function blobBase64(blob){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=()=>reject(Error('读取文档失败'));reader.readAsDataURL(blob);});}
+$('wps-copy').onclick=async()=>{
+    const text=$('latex').value.trim();if(!text)return;
+    $('wps-copy').disabled=true;
+    try{
+        const blob=await (await api('/api/word',{latex:text})).blob();
+        if(isDesktop){
+            await nativeCall('open-wps',{base64:await blobBase64(blob)});
+            status('已在 WPS 打开可编辑公式；全选并复制，再粘贴到目标文档。');
+        }else{
+            const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='formula-wps.docx';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);
+            status('已下载 WPS 公式文档。用 WPS 打开后可编辑、复制。');
+        }
+    }catch(e){status(e.message,true);}finally{updateButtons();}
+};
 $('word').onclick=async()=>{const text=$('latex').value.trim();if(!text)return;try{const blob=await (await api('/api/word',{latex:text})).blob();if(isDesktop){const base64=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result.split(',')[1]);reader.onerror=reject;reader.readAsDataURL(blob);});await nativeCall('save',{base64});toast('Word 文档已保存');return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='formula.docx';document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),30000);toast('Word 文档已生成，请查看浏览器下载。');}catch(e){status(e.message,true);}};
 document.querySelectorAll('.example').forEach(button=>button.onclick=async()=>{try{const r=await fetch(`/static/examples/${button.dataset.example}.png`);if(!r.ok)throw Error('示例图片加载失败');await loadImage(await r.blob());}catch(e){status(e.message,true);}});
 $('help').onclick=()=>$('help-dialog').showModal();$('close-help').onclick=$('help-ok').onclick=()=>$('help-dialog').close();
@@ -46,7 +71,7 @@ $('capture').onclick=async()=>{
     capturing=true;updateButtons();
     try{
         status('请拖动框选公式，松开鼠标完成；按 Esc 取消。');
-        if(isWindowsDesktop){
+        if(isDesktop){
             const encoded=await nativeCall('capture');
             if(!encoded){status('已取消截图');return;}
             const bytes=Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));

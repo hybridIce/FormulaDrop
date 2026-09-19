@@ -14,6 +14,7 @@ import latex2mathml.converter
 import mathml2omml
 from docx import Document
 from docx.oxml import parse_xml
+from lxml import etree
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -172,6 +173,45 @@ def mathml(latex):
         raise HTTPException(422, "公式暂时无法转换，请检查 LaTeX 语法。")
 
 
+def office_math(latex):
+    """Use simple OMML arguments that WPS and Word both preserve on import."""
+    mml_ns = "http://www.w3.org/1998/Math/MathML"
+    office_ns = "http://schemas.openxmlformats.org/officeDocument/2006/math"
+    word_ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    source = etree.fromstring(mathml(latex).encode())
+    # latex2mathml represents display-style movable limits as ordinary scripts.
+    for node in source.iter():
+        replacement = {"msub": "munder", "msup": "mover", "msubsup": "munderover"}.get(etree.QName(node).localname)
+        if (replacement and len(node) and node[0].get("movablelimits") == "true"
+                and not any(p.get("displaystyle") == "false" for p in node.iterancestors())):
+            node.tag = f"{{{mml_ns}}}{replacement}"
+    converted = mathml2omml.convert(etree.tostring(source, encoding="unicode"))
+    root = parse_xml(f'<m:oMathPara xmlns:m="{office_ns}" xmlns:w="{word_ns}">{converted}</m:oMathPara>')
+    ns = {"m": office_ns}
+    # mathml2omml adds a box around every mrow. WPS loses superscripts and
+    # operator text inside these unnecessary wrappers (including max and lim).
+    for box in reversed(root.xpath(".//m:box", namespaces=ns)):
+        if len(box) != 1 or box[0].tag != f"{{{office_ns}}}e":
+            continue
+        parent = box.getparent()
+        index = parent.index(box)
+        for child in list(box[0]):
+            parent.insert(index, child)
+            index += 1
+        parent.remove(box)
+    for radical in root.xpath(".//m:rad[not(m:deg)]", namespaces=ns):
+        props = etree.Element(f"{{{office_ns}}}radPr")
+        etree.SubElement(props, f"{{{office_ns}}}degHide", {f"{{{office_ns}}}val": "1"})
+        radical.insert(0, props)
+        radical.insert(1, etree.Element(f"{{{office_ns}}}deg"))
+    for run in root.xpath(".//m:r", namespaces=ns):
+        props = etree.Element(f"{{{word_ns}}}rPr")
+        etree.SubElement(props, f"{{{word_ns}}}rFonts", {
+            f"{{{word_ns}}}ascii": "Cambria Math", f"{{{word_ns}}}hAnsi": "Cambria Math"})
+        run.insert(1 if run.find("m:rPr", ns) is not None else 0, props)
+    return root
+
+
 @app.post("/api/mathml")
 def convert_formula(body: Formula):
     return {"mathml": mathml(body.latex)}
@@ -180,10 +220,8 @@ def convert_formula(body: Formula):
 @app.post("/api/word")
 def export_word(body: Formula):
     try:
-        omml = mathml2omml.convert(mathml(body.latex))
-        xml = f'<m:oMathPara xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math">{omml}</m:oMathPara>'
         doc = Document()
-        doc.add_paragraph()._p.append(parse_xml(xml))
+        doc.add_paragraph()._p.append(office_math(body.latex))
         out = io.BytesIO()
         doc.save(out)
         return Response(out.getvalue(), media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document", headers={"Content-Disposition": 'attachment; filename="formula.docx"'})
